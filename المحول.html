@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>💱 محول العملات إلى الجنيه المصري</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      background: linear-gradient(135deg, #00b4d8, #0077b6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+      margin: 0;
+    }
+
+    .converter {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+      animation: fadeIn 1s ease;
+    }
+
+    h2 {
+      margin-bottom: 15px;
+    }
+
+    select, input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      text-align: center;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    select:focus, input:focus {
+      box-shadow: 0 0 8px #90e0ef;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 15px;
+      padding: 12px;
+      font-size: 18px;
+      background: #023e8a;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      background: #03045e;
+      transform: scale(1.05);
+    }
+
+    #result {
+      margin-top: 20px;
+      font-weight: bold;
+      background: #ffffff33;
+      padding: 10px;
+      border-radius: 10px;
+      animation: fadeIn 0.6s ease;
+    }
+
+    #lastUpdate {
+      font-size: 14px;
+      margin-top: 8px;
+      color: #caf0f8;
+    }
+
+    canvas {
+      margin-top: 20px;
+      background: #ffffff22;
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="converter">
+    <h2>💱 محول العملات إلى الجنيه المصري</h2>
+
+    <label>اختر العملة:</label>
+    <select id="currencySelect" onchange="convertCurrency()">
+      <option value="USD">🇺🇸 الدولار الأمريكي (USD)</option>
+      <option value="EUR">🇪🇺 اليورو (EUR)</option>
+      <option value="GBP">🇬🇧 الجنيه الإسترليني (GBP)</option>
+      <option value="SAR">🇸🇦 الريال السعودي (SAR)</option>
+      <option value="AED">🇦🇪 الدرهم الإماراتي (AED)</option>
+      <option value="JPY">🇯🇵 الين الياباني (JPY)</option>
+      <option value="CNY">🇨🇳 اليوان الصيني (CNY)</option>
+      <option value="INR">🇮🇳 الروبية الهندية (INR)</option>
+    </select>
+
+    <label>اكتب المبلغ:</label>
+    <input type="number" id="amountInput" value="1" min="0" oninput="convertCurrency()" />
+
+    <button onclick="convertCurrency()">احسب الآن</button>
+
+    <p id="result">جارٍ التحميل...</p>
+    <p id="lastUpdate"></p>
+
+    <canvas id="rateChart" height="150"></canvas>
+  </div>
+
+  <script>
+    let chart;
+    let rateHistory = [];
+    let timeLabels = [];
+
+    async function fetchRates(currency) {
+      try {
+        const res = await fetch(`https://api.exchangerate-api.com/v4/latest/${currency}`);
+        const data = await res.json();
+        const egpRate = data.rates["EGP"];
+        const time = new Date().toLocaleTimeString('ar-EG');
+
+        // تحديث التاريخ و السعر
+        document.getElementById("lastUpdate").textContent = `⏰ آخر تحديث: ${time}`;
+        rateHistory.push(egpRate);
+        timeLabels.push(time);
+
+        // الاحتفاظ فقط بآخر 7 بيانات
+        if (rateHistory.length > 7) {
+          rateHistory.shift();
+          timeLabels.shift();
+        }
+
+        return egpRate;
+      } catch (err) {
+        console.error(err);
+        document.getElementById("result").textContent = "⚠️ حدث خطأ أثناء جلب السعر";
+        return null;
+      }
+    }
+
+    async function convertCurrency() {
+      const currency = document.getElementById("currencySelect").value;
+      const amount = parseFloat(document.getElementById("amountInput").value);
+      const resultEl = document.getElementById("result");
+
+      const rate = await fetchRates(currency);
+      if (rate) {
+        const converted = (amount * rate).toFixed(2);
+        resultEl.textContent = `${amount} ${currency} = ${converted} جنيه مصري 💰`;
+        updateChart(rate);
+      }
+    }
+
+    function updateChart(currentRate) {
+      const ctx = document.getElementById("rateChart").getContext("2d");
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: timeLabels,
+          datasets: [{
+            label: 'سعر الصرف مقابل الجنيه المصري',
+            data: rateHistory,
+            borderColor: '#90e0ef',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: '#fff'
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { labels: { color: '#fff' } }
+          },
+          scales: {
+            x: { ticks: { color: '#caf0f8' } },
+            y: { ticks: { color: '#caf0f8' } }
+          }
+        }
+      });
+    }
+
+    // تحديث تلقائي كل 10 ثوانٍ
+    setInterval(convertCurrency, 10000);
+
+    // تحميل أولي عند فتح الصفحة
+    window.onload = convertCurrency;
+  </script>
+</body>
+</html>
